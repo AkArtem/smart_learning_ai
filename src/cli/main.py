@@ -3,75 +3,42 @@ import sqlite3
 from src.db.database import DatabaseManager
 from src.models.session import SessionRecord
 
-def cmd_init():
+def cmd_init(args=None):
     db = DatabaseManager()
     db.migrate()
     print(f"Database initialized at {db.db_path}")
 
 def cmd_add_subject(args):
     db = DatabaseManager()
-    conn = db._connect()
     try:
-        cur = conn.cursor()
-        cur.execute("INSERT INTO subjects (name) VALUES (?)", (args.name,))
-        conn.commit()
-        print(f"Subject '{args.name}' added with id={cur.lastrowid}")
+        sid = db.add_subject(args.name)
+        print(f"Subject '{args.name}' added with id={sid}")
     except sqlite3.IntegrityError:
         print(f"Subject '{args.name}' already exists")
-    finally:
-        conn.close()
+    except ValueError as e:
+        print(e)
 
 def cmd_delete_subject(args):
     db = DatabaseManager()
-    conn = db._connect()
-    try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM subjects WHERE id = ?", (args.subject_id,))
-        if cur.rowcount > 0:
-            print(f"Deleted subject id={args.subject_id} and associated sessions")
-        else:
-            print(f"No subject found with id={args.subject_id}")
-        conn.commit()
-    finally:
-        conn.close()
+    rc = db.delete_subject(args.subject_id)
+    if rc > 0:
+        print(f"Deleted subject id={args.subject_id} and associated sessions")
+    else:
+        print(f"No subject found with id={args.subject_id}")
 
 def cmd_show_subject(args):
     db = DatabaseManager()
-    conn = db._connect()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM subjects WHERE id = ?", (args.subject_id,))
-        row = cur.fetchone()
-        if row:
-            print(f"Subject id={row['id']}: {row['name']}")
-        else:
-            print(f"No subject found with id={args.subject_id}")
-    finally:
-        conn.close()
+    subj = db.get_subject(args.subject_id)
+    if subj:
+        print(f"Subject id={subj.id}: {subj.name}")
+    else:
+        print(f"No subject found with id={args.subject_id}")
 
 def cmd_list_subjects(args):
     db = DatabaseManager()
-    conn = db._connect()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM subjects ORDER BY name")
-        rows = cur.fetchall()
-        for row in rows:
-            print(f"{row['id']}: {row['name']}")
-    finally:
-        conn.close()
-
-def cmd_list_subjects(args):
-    db = DatabaseManager()
-    conn = db._connect()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM subjects ORDER BY name")
-        rows = cur.fetchall()
-        for row in rows:
-            print(f"{row['id']}: {row['name']}")
-    finally:
-        conn.close()
+    subjects = db.get_subjects()
+    for s in subjects:
+        print(f"{s.id}: {s.name}")
 
 def cmd_add_session(args):
     db = DatabaseManager()
@@ -91,7 +58,7 @@ def cmd_show_session(args):
     db = DatabaseManager()
     session = db.get_session(args.session_id)
     if session:
-        print(f"Session id={session.id}: subject_id={session.subject_id}, "
+        print(f"Session id={session.id}: Subject ID={session.subject_id}, "
               f"{session.start_time} {session.date}, {session.duration_minutes}min, "
               f"focus={session.focus_level}, score={session.test_score}, notes={session.notes}")
     else:
@@ -99,17 +66,11 @@ def cmd_show_session(args):
     
 def cmd_delete_session(args):
     db = DatabaseManager()
-    conn = db._connect()
-    try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM learning_sessions WHERE id = ?", (args.session_id,))
-        if cur.rowcount > 0:
-            print(f"Deleted session id={args.session_id}")
-        else:
-            print(f"No session found with id={args.session_id}")
-        conn.commit()
-    finally:
-        conn.close()
+    rc = db.delete_session(args.session_id)
+    if rc > 0:
+        print(f"Deleted session id={args.session_id}")
+    else:
+        print(f"No session found with id={args.session_id}")
 
 def cmd_list_sessions(args):
     db = DatabaseManager()

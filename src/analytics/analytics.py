@@ -58,6 +58,67 @@ def weekly_minutes(df):
 def top_subjects(df, n=5):
     return df.groupby("subject_name")["duration_minutes"].sum().sort_values(ascending=False).head(n)
 
+
+def longest_streak(df):
+    dates = sorted(set(pd.to_datetime(df["date"]).dt.date))
+    if not dates:
+        return 0
+    streak = max_streak = 1
+    for i in range(1, len(dates)):
+        if (dates[i] - dates[i - 1]).days == 1:
+            streak += 1
+        else:
+            if streak > max_streak:
+                max_streak = streak
+            streak = 1
+    return max(max_streak, streak)
+
+
+def rolling_minutes(df, window_days=7):
+    if df.empty:
+        return pd.Series(dtype="float")
+    s = df.set_index("start_timestamp").resample("D")["duration_minutes"].sum().fillna(0)
+    return s.rolling(window=window_days).sum()
+
+
+def growth_rate(df):
+    s = weekly_minutes(df)
+    if len(s) < 2:
+        return None
+    prev = s.iloc[-2]
+    last = s.iloc[-1]
+    if prev == 0:
+        return None
+    return float((last - prev) / prev)
+
+
+def focus_score_corr(df):
+    if df.empty or "test_score" not in df or df["test_score"].dropna().empty:
+        return None
+    sub = df[["focus_level", "test_score"]].dropna()
+    if sub.empty:
+        return None
+    return float(sub.corr().iloc[0, 1])
+
+
+def recommendations(df):
+    if df.empty:
+        return ["No data to generate recommendations"]
+    recs = []
+    ls = longest_streak(df)
+    if ls < 3:
+        recs.append("Try to study for at least 3 consecutive days to build habit.")
+    gr = growth_rate(df)
+    if gr is not None and gr < 0:
+        recs.append("Weekly study time is dropping — try shorter focused sessions.")
+    corr = focus_score_corr(df)
+    if corr is not None and corr > 0.2:
+        recs.append("Improving focus correlates with better scores — practice focus techniques.")
+    top = top_subjects(df, n=1)
+    if not top.empty:
+        recs.append(f"Most study time is on {top.index[0]} — balance your schedule if needed.")
+    return recs
+
 def missing_report(df):
     return df.isna().sum()
 

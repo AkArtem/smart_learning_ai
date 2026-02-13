@@ -134,6 +134,33 @@ def main():
     p_plot.add_argument("--out-dir", default="data/plots")
     p_plot.set_defaults(func=cmd_analytics_plot)
 
+    p_streak = sub.add_parser("analytics-streak")
+    p_streak.set_defaults(func=cmd_analytics_streak)
+
+    p_focus_plot = sub.add_parser("analytics-plot-focus-trend")
+    p_focus_plot.add_argument("--out-dir", default="data/plots")
+    p_focus_plot.set_defaults(func=cmd_analytics_plot_focus)
+
+    p_best_hours = sub.add_parser("analytics-best-hours")
+    p_best_hours.add_argument("--out-dir", default="data/plots")
+    p_best_hours.set_defaults(func=cmd_analytics_best_hours)
+
+    p_rolling = sub.add_parser("analytics-rolling")
+    p_rolling.set_defaults(func=cmd_analytics_rolling)
+
+    p_growth = sub.add_parser("analytics-growth-rate")
+    p_growth.set_defaults(func=cmd_analytics_growth)
+
+    p_corr = sub.add_parser("analytics-focus-corr")
+    p_corr.set_defaults(func=cmd_analytics_corr)
+
+    p_recs = sub.add_parser("analytics-recommendations")
+    p_recs.set_defaults(func=cmd_analytics_recommendations)
+
+    p_all = sub.add_parser("analytics-all-plots")
+    p_all.add_argument("--out-dir", default="data/plots")
+    p_all.set_defaults(func=cmd_analytics_all_plots)
+
     p_quality = sub.add_parser("analytics-quality")
     p_quality.set_defaults(func=cmd_analytics_quality)
 
@@ -193,6 +220,68 @@ def cmd_analytics_plot(args):
             print(f"  {p}")
     else:
         print("No charts generated")
+
+
+def cmd_analytics_streak(args):
+    df = analytics.df_from_db()
+    s = analytics.longest_streak(df)
+    print(f"Longest streak: {s} days")
+
+
+def cmd_analytics_plot_focus(args):
+    df = analytics.df_from_db()
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
+    fig = visualization.plot_focus_trend(df)
+    path = os.path.join(out_dir, "focus_trend.png")
+    fig.savefig(path)
+    print(f"Saved focus trend: {path}")
+
+
+def cmd_analytics_best_hours(args):
+    df = analytics.df_from_db()
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
+    fig = visualization.plot_best_hours(df)
+    path = os.path.join(out_dir, "best_hours.png")
+    fig.savefig(path)
+    print(f"Saved best hours: {path}")
+
+
+def cmd_analytics_rolling(args):
+    df = analytics.df_from_db()
+    r = analytics.rolling_minutes(df)
+    print(r.tail(10))
+
+
+def cmd_analytics_growth(args):
+    df = analytics.df_from_db()
+    gr = analytics.growth_rate(df)
+    print(f"Growth rate (last week vs prev): {gr}")
+
+
+def cmd_analytics_corr(args):
+    df = analytics.df_from_db()
+    c = analytics.focus_score_corr(df)
+    print(f"Focus/test_score correlation: {c}")
+
+
+def cmd_analytics_recommendations(args):
+    df = analytics.df_from_db()
+    recs = analytics.recommendations(df)
+    print("Recommendations:")
+    for r in recs:
+        print(f" - {r}")
+
+
+def cmd_analytics_all_plots(args):
+    df = analytics.df_from_db()
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
+    fig = visualization.plot_all_charts(df)
+    path = os.path.join(out_dir, "all_charts.png")
+    fig.savefig(path)
+    print(f"Saved combined charts: {path}")
 
 
 def cmd_analytics_quality(args):

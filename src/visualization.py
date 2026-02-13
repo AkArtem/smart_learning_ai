@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 def plot_sessions_over_time(df, ax=None):
@@ -15,6 +16,7 @@ def plot_sessions_over_time(df, ax=None):
     ax.set_title('Study Minutes per Week')
     ax.set_xlabel('Week')
     ax.set_ylabel('Minutes')
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
     fig.tight_layout()
     return fig
 

@@ -75,7 +75,7 @@ class DatabaseManager:
         conn = self._connect()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT * FROM subjects ORDER BY name")
+            cur.execute("SELECT * FROM subjects ORDER BY id")
             rows = cur.fetchall()
             return [Subject(id=row["id"], name=row["name"]) for row in rows]
         finally:
@@ -169,7 +169,7 @@ class DatabaseManager:
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT * FROM learning_sessions ORDER BY start_timestamp DESC LIMIT ?
+                SELECT * FROM learning_sessions ORDER BY id LIMIT ?
                 """, (limit,))
             rows = cur.fetchall()
             return [SessionRecord.from_row(row) for row in rows]

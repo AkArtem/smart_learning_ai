@@ -177,3 +177,19 @@ class DatabaseManager:
             conn.close()
     def get_sessions(self, limit: int = 10):
         return self.list_sessions(limit=limit)
+    
+    def list_sessions_for_subject(self, subject_id: int, limit: int = 100):
+        conn = self._connect()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT * FROM learning_sessions 
+                WHERE subject_id = ? 
+                ORDER BY start_timestamp DESC 
+                LIMIT ?
+                """, (subject_id, limit))
+            rows = cur.fetchall()
+            return [SessionRecord.from_row(row) for row in rows]
+        finally:
+            conn.close()

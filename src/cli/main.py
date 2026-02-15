@@ -5,6 +5,10 @@ from src.db.database import DatabaseManager
 from src.models.session import SessionRecord
 from src.analytics import analytics
 from src import visualization
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from src.ml import preprocessing, features, train, model, predict
+
 
 def cmd_init(args=None):
     db = DatabaseManager()
@@ -175,6 +179,33 @@ def main():
     p_report.add_argument("--out-dir", default="data/exports")
     p_report.set_defaults(func=cmd_analytics_report)
 
+    #ML Commands
+    p_ml_train = sub.add_parser("ml-train")
+    p_ml_train.set_defaults(func=cmd_ml_train)
+    
+    p_ml_predict = sub.add_parser("ml-predict")
+    p_ml_predict.add_argument("--model", dest='model_name', default='RandomForestModel')
+    p_ml_predict.set_defaults(func=cmd_ml_predict)
+    
+    p_ml_eval = sub.add_parser("ml-evaluate")
+    p_ml_eval.set_defaults(func=cmd_ml_evaluate)
+    
+    p_ml_list = sub.add_parser("ml-list-models")
+    p_ml_list.set_defaults(func=cmd_ml_list_models)
+    
+    p_ml_delete = sub.add_parser("ml-delete-model")
+    p_ml_delete.add_argument("model_name")
+    p_ml_delete.set_defaults(func=cmd_ml_delete_model)
+    
+    p_ml_ensemble = sub.add_parser("ml-ensemble-predict")
+    p_ml_ensemble.add_argument("--models", default='LinearRegression,RandomForest,GradientBoosting')
+    p_ml_ensemble.add_argument("--method", choices=['average', 'median'], default='average')
+    p_ml_ensemble.set_defaults(func=cmd_ml_ensemble_predict)
+    
+    p_ml_info = sub.add_parser("ml-info")
+    p_ml_info.add_argument("model_name")
+    p_ml_info.set_defaults(func=cmd_ml_info)
+
     args = parser.parse_args()
     if hasattr(args, "func"):
         args.func(args)
@@ -335,6 +366,228 @@ def cmd_analytics_report(args):
         f.write(f"Most productive subject: {prod}\n")
         f.write(f"Weakest subject: {weak}\n")
     print(f"Exported report: {path}")
+
+
+#ML Commands
+
+def cmd_ml_train(args):
+    try:
+        df = analytics.df_from_db()
+        if df.empty:
+            print("No session data available. Add some sessions first.")
+            return
+        
+        print(f"Loading {len(df)} sessions...")
+        feature_cols = ['focus_level', 'duration_minutes']
+        X = df[feature_cols].copy()
+        y = df['test_score'].copy()
+        
+        print(f"Using {len(feature_cols)} features: {feature_cols}")
+        print(f"Feature shape: {X.shape}")
+        
+        X = preprocessing.clean_data(X.assign(test_score=y)).drop('test_score', axis=1)
+        y = y[X.index]
+        
+        X_train, X_test, y_train, y_test = preprocessing.train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
+        X_train_scaled, X_test_scaled, scaler = preprocessing.scale_features(X_train, X_test)
+        
+        print(f"Train set: {X_train_scaled.shape[0]} samples")
+        print(f"Test set: {X_test_scaled.shape[0]} samples")
+        
+        print("Training models...")
+        models_dict = train.train_all_models(X_train_scaled, y_train)
+        
+        print("\nModel Performance on Test Set:")
+        print("-" * 60)
+        for model_name, mod in models_dict.items():
+            y_pred = mod.predict(X_test_scaled)
+            metrics = model.evaluate_model(y_test, y_pred)
+            print(f"\n{model_name}:")
+            for metric_name, value in metrics.items():
+                print(f"  {metric_name:10s}: {value:.4f}")
+        
+        print("\nSaving models...")
+        predict.save_all_models(models_dict, 'models')
+        print("Models saved to 'models/' directory")
+        
+    except Exception as e:
+        print(f"Error during training: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def cmd_ml_predict(args):
+    try:
+        model_name = args.model_name if hasattr(args, 'model_name') else 'RandomForest'
+        
+        print(f"Loading model: {model_name}...")
+        mod = predict.load_model(model_name, 'models')
+        
+        df = analytics.df_from_db()
+        if df.empty:
+            print("No session data available.")
+            return
+        
+        feature_cols = ['focus_level', 'duration_minutes']
+        X = df[feature_cols].copy()
+        
+        X_clean = preprocessing.clean_data(X.assign(test_score=df['test_score'])).drop('test_score', axis=1)
+        
+        predictions = predict.predict(mod, X_clean)
+        
+        print(f"\nPredictions from {model_name}:")
+        print(f"Total predictions: {len(predictions)}")
+        print(f"Average prediction: {predictions.mean():.2f}")
+        print(f"Min prediction: {predictions.min():.2f}")
+        print(f"Max prediction: {predictions.max():.2f}")
+        print(f"\nSample predictions (first 5):")
+        for i, pred in enumerate(predictions[:5]):
+            print(f"  Sample {i+1}: {pred:.2f}")
+        
+        if len(predictions) > 5:
+            print(f"  ... and {len(predictions) - 5} more predictions")
+        
+    except Exception as e:
+        print(f"Error during prediction: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def cmd_ml_evaluate(args):
+    try:
+        df = analytics.df_from_db()
+        if df.empty:
+            print("No session data available.")
+            return
+        
+        print(f"Loading {len(df)} sessions...")
+        
+        feature_cols = ['focus_level', 'duration_minutes']
+        X = df[feature_cols].copy()
+        y = df['test_score'].copy()
+        X_clean = preprocessing.clean_data(X.assign(test_score=y)).drop('test_score', axis=1)
+        y = y[X_clean.index]
+        cv_folds = 5
+        
+        print(f"Running {cv_folds}-fold cross-validation with {len(feature_cols)} features...")
+        print("\nModel Performance (Cross-Validation):")
+        print("-" * 60)
+        
+        lin_mod = train.LinearModel()
+        lin_mod.train(X_clean, y)
+        cv_lin = train.cross_validate_model(lin_mod, X_clean, y, cv_folds)
+        print(f"\nLinearModel:")
+        for metric, value in cv_lin.items():
+            print(f"  {metric:20s}: {value:.4f}")
+
+        rf_mod = train.RandomForestModel()
+        rf_mod.train(X_clean, y)
+        cv_rf = train.cross_validate_model(rf_mod, X_clean, y, cv_folds)
+        print(f"\nRandomForestModel:")
+        for metric, value in cv_rf.items():
+            print(f"  {metric:20s}: {value:.4f}")
+
+        gb_mod = train.GradientBoostingModel()
+        gb_mod.train(X_clean, y)
+        cv_gb = train.cross_validate_model(gb_mod, X_clean, y, cv_folds)
+        print(f"\nGradientBoostingModel:")
+        for metric, value in cv_gb.items():
+            print(f"  {metric:20s}: {value:.4f}")
+        
+    except Exception as e:
+        print(f"Error during evaluation: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def cmd_ml_list_models(args):
+    try:
+        import os
+        model_dir = 'models'
+        if not os.path.exists(model_dir):
+            print("No models found. Train models first with 'ml-train'")
+            return
+        
+        models = [f[:-4] for f in os.listdir(model_dir) if f.endswith('.pkl')]
+        if not models:
+            print("No models found.")
+            return
+        
+        print("Trained Models:")
+        for m in sorted(models):
+            print(f"  - {m}")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+def cmd_ml_delete_model(args):
+    try:
+        model_name = args.model_name
+        import os
+        filepath = f"models/{model_name}.pkl"
+        
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print(f"Deleted {model_name}")
+        else:
+            print(f"Model not found: {model_name}")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+def cmd_ml_ensemble_predict(args):
+    try:
+        model_names = args.models.split(',') if hasattr(args, 'models') else ['LinearRegression', 'RandomForest', 'GradientBoosting']
+        ensemble_method = args.method if hasattr(args, 'method') else 'average'
+        
+        print(f"Loading ensemble: {', '.join(model_names)}...")
+        
+        models_dict = predict.load_all_models(model_names, 'models')
+        
+        df = analytics.df_from_db()
+        if df.empty:
+            print("No session data available.")
+            return
+        
+        feature_cols = ['focus_level', 'duration_minutes']
+        X = df[feature_cols].copy()
+        
+        X_clean = preprocessing.clean_data(X.assign(test_score=df['test_score'])).drop('test_score', axis=1)
+        
+        ensemble_preds = predict.ensemble_predict(models_dict, X_clean, ensemble_method)
+        
+        print(f"\nEnsemble Prediction ({ensemble_method}):")
+        print(f"Total predictions: {len(ensemble_preds)}")
+        print(f"Average prediction: {ensemble_preds.mean():.2f}")
+        
+        print(f"Sample predictions (first 5):")
+        for i, pred in enumerate(ensemble_preds[:5]):
+            print(f"  {i+1}: {pred:.2f}")
+        
+        if len(ensemble_preds) > 5:
+            print(f"  ... and {len(ensemble_preds) - 5} more")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def cmd_ml_info(args):
+    try:
+        model_name = args.model_name
+        mod = predict.load_model(model_name, 'models')
+        
+        print(f"Model: {model_name}")
+        print(f"Type: {type(mod).__name__}")
+        print(f"Loaded from: models/{model_name}.pkl")
+        
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()

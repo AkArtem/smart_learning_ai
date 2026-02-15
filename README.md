@@ -1,43 +1,45 @@
-# smart_learning_ai
-Smart learning analytics and recommendation system using Python, SQL, and Machine Learning.
+# Smart Learning AI
 
-What is this project:
-- Simple learning tracker that stores study subjects and learning sessions in SQLite.
-- Small CLI to initialize the database and add/list/delete subjects and sessions.
+A learning tracker with ML-powered score predictions.
 
-Quick start:
-- Install dependencies from requirements.txt
+## What it does
+- Tracks study sessions (duration, focus level, test scores)
+- Analyzes study patterns and performance
+- Predicts test scores based on focus + study time
 
-Commands to work with project
+## How Predictions Work
+Models learn from study history to predict scores:
+- Input: focus level (1-5) + study duration (minutes)
+- Output: predicted test score
+
+## Setup
+```
+pip install -r requirements.txt
+```
+
+## Quick Commands
+
+**Manage Sessions:**
 ```
 python -m src.cli.main add-subject Math
-python -m src.cli.main list-subjects
 python -m src.cli.main add-session 1 2026-02-11 --start-time 18:30 --duration 60 --focus 4
 python -m src.cli.main list-sessions
-python -m src.cli.main show-session 1
-python -m src.cli.main delete-session 1
 ```
 
-Tests:
-- Run pytest to execute the unit tests (there are tests for models, database, analytics, and CLI)
+**Analytics:**
+```
+python -m src.cli.main analytics-summary
+python -m src.cli.main analytics-dashboard
+```
+
+**ML Predictions:**
+```
+python -m src.cli.main ml-train
+python -m src.cli.main ml-predict
+python -m src.cli.main ml-ensemble-predict
+```
+
+## Testing
 ```
 pytest -q
 ```
-
--Analytics:
-
-This project includes an analytics module that extracts data from the application's SQLite database and provides summary and visualization
-
-CLI examples:
-```
-python -m src.cli.main analytics-summary
-
-python -m src.cli.main analytics-quality
-
-python -m src.cli.main analytics-dashboard
-
-python -m src.cli.main analytics-insights
-
-python -m src.cli.main analytics-report
-```
-The notebook `notebooks/analysis_demo.ipynb` demonstrates loading the DataFrame, rendering the dashboard and printing insights

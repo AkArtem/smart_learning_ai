@@ -184,7 +184,7 @@ def main():
     p_ml_train.set_defaults(func=cmd_ml_train)
     
     p_ml_predict = sub.add_parser("ml-predict")
-    p_ml_predict.add_argument("--model", dest='model_name', default='RandomForestModel')
+    p_ml_predict.add_argument("--model", dest='model_name', default='RandomForest')
     p_ml_predict.set_defaults(func=cmd_ml_predict)
     
     p_ml_eval = sub.add_parser("ml-evaluate")

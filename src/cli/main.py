@@ -8,6 +8,7 @@ from src import visualization
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from src.ml import preprocessing, features, train, model, predict
+from src.recommender.recommender import RecommendationEngine, print_recommendation_summary
 
 
 def cmd_init(args=None):
@@ -161,6 +162,16 @@ def main():
     p_recs = sub.add_parser("analytics-recommendations")
     p_recs.set_defaults(func=cmd_analytics_recommendations)
 
+    p_daily_plan = sub.add_parser("recommend-daily-plan")
+    p_daily_plan.add_argument("--date", default=None, help="YYYY-MM-DD, default today")
+    p_daily_plan.set_defaults(func=cmd_recommend_daily_plan)
+
+    p_weekly_plan = sub.add_parser("recommend-weekly-plan")
+    p_weekly_plan.set_defaults(func=cmd_recommend_weekly_plan)
+
+    p_rec_dashboard = sub.add_parser("recommend-dashboard")
+    p_rec_dashboard.set_defaults(func=cmd_recommend_dashboard)
+
     p_all = sub.add_parser("analytics-all-plots")
     p_all.add_argument("--out-dir", default="data/plots")
     p_all.set_defaults(func=cmd_analytics_all_plots)
@@ -298,11 +309,59 @@ def cmd_analytics_corr(args):
 
 
 def cmd_analytics_recommendations(args):
-    df = analytics.df_from_db()
-    recs = analytics.recommendations(df)
-    print("Recommendations:")
-    for r in recs:
-        print(f" - {r}")
+    engine = RecommendationEngine()
+    print(engine.get_text_advice())
+
+
+def cmd_recommend_daily_plan(args):
+    engine = RecommendationEngine()
+    plan = engine.generate_daily_plan(args.date)
+    
+    print(f"Daily Plan - {plan['date']}")
+    print("=" * 40)
+    for session in plan["sessions"]:
+        print(f"\n{session['time']}")
+        print(f"  Subject: {session['subject']}")
+        print(f"  Duration: {session['duration']} minutes")
+        print(f"  Break after: {session['break_after']} minutes")
+    print(f"\nTotal: {plan['total_time']} minutes")
+
+
+def cmd_recommend_weekly_plan(args):
+    engine = RecommendationEngine()
+    plan = engine.generate_weekly_plan()
+    
+    print(f"Weekly Plan - {plan['week']}")
+    print("=" * 40)
+    print(f"Daily target: {plan['daily_target']} minutes\n")
+    
+    for i, subj in enumerate(plan["subjects"], 1):
+        print(f"{i}. {subj['subject']}")
+        print(f"   Sessions this week: {subj['sessions']}")
+        print(f"   Total time: {subj['total_minutes']} minutes\n")
+
+def cmd_recommend_dashboard(args):
+    engine = RecommendationEngine()
+    dashboard = engine.get_dashboard()
+    
+    print("Learning Dashboard")
+    print("=" * 40)
+    print(f"\nStatus: {dashboard['status']}")
+    print(f"\nMetrics:")
+    print(f"  Focus Level: {dashboard['metrics']['focus_level']}")
+    print(f"  Avg Score: {dashboard['metrics']['avg_score']}")
+    print(f"  Study Consistency: {dashboard['metrics']['study_consistency']} days")
+    print(f"  Recommendations: {dashboard['metrics']['recommendation_count']}")
+    
+    print(f"\nTop Subjects:")
+    for subj, sessions in dashboard["top_subjects"].items():
+        print(f"  {subj}: {sessions} sessions")
+    
+    print(f"\nRecommendations by Priority:")
+    print(f"  High: {len(dashboard['recommendations_by_priority']['high'])}")
+    print(f"  Medium: {len(dashboard['recommendations_by_priority']['medium'])}")
+    print(f"  Low: {len(dashboard['recommendations_by_priority']['low'])}")
+
 
 
 def cmd_analytics_all_plots(args):

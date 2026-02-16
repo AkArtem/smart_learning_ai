@@ -1,11 +1,13 @@
 # Smart Learning AI
 
-A learning tracker with ML-powered score predictions.
+An intelligent learning tracker with analytics, machine learning predictions,
+and a personalized recommendation system.
 
 ## What it does
-- Tracks study sessions (duration, focus level, test scores)
-- Analyzes study patterns and performance
-- Predicts test scores based on focus + study time
+- Tracks study sessions (duration, focus level, test scores), manage subjects, store in SQLite
+- Analyzes study patterns and performance, create visual dashboards
+- Predicts test scores based on focus + study time, train / evaluate / save models
+- Personalize study advice, provide daily and weekly planning, learning dashboard
 
 ## How Predictions Work
 Models learn from study history to predict scores:
@@ -37,6 +39,14 @@ python -m src.cli.main analytics-dashboard
 python -m src.cli.main ml-train
 python -m src.cli.main ml-predict
 python -m src.cli.main ml-ensemble-predict
+```
+
+**Recommendations:**
+```
+python -m src.cli.main analytics-recommendations
+python -m src.cli.main recommend-daily-plan
+python -m src.cli.main recommend-weekly-plan
+python -m src.cli.main recommend-dashboard
 ```
 
 ## Testing
